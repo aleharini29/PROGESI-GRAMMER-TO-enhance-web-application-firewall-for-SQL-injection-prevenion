@@ -1,0 +1,198 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import Text
+from tkinter import filedialog
+import numpy as np
+import pandas as pd
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
+
+# Global variables to store data, labels, and model accuracies
+global tokenizer, model, X_train, X_test, Y_train, Y_test, texts, labels, df
+model_accuracies = {}  # Dictionary to store model accuracies
+
+# Function to load dataset
+def load_dataset():
+    global texts, labels, df
+    filename = filedialog.askopenfilename(title="Select Dataset", filetypes=[("CSV Files", "*.csv")])
+    if filename:
+        df = pd.read_csv(filename)  # Load the dataset from the selected CSV file
+        texts = df['Query'].values
+        labels = df['Label'].values
+        text.delete('1.0', tk.END)
+        text.insert(tk.END, f"Dataset loaded from: {filename}\n\n")
+        text.insert(tk.END, df.head())
+    else:
+        messagebox.showerror("Error", "Please select a valid CSV file.")
+
+# Function for data preprocessing
+def preprocess_data():
+    global tokenizer, X_train, X_test, Y_train, Y_test, df
+    if df is None or df.empty:
+        messagebox.showerror("Error", "Please upload a dataset first.")
+        return
+    
+    texts = df['Query'].values
+    labels = df['Label'].values
+    
+    tokenizer = Tokenizer(num_words=10000)
+    tokenizer.fit_on_texts(texts)
+    sequences = tokenizer.texts_to_sequences(texts)
+    X = pad_sequences(sequences, maxlen=100)
+    Y = np.array(labels)
+    
+    # Allocate 80% of the data for training and 20% for testing
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    
+    # Display training and testing data information
+    text.delete(1.0, tk.END)
+    text.insert(tk.END, f"Data Preprocessing Completed.\n")
+    text.insert(tk.END, f"Total rows in dataset: {len(df)}\n")
+    text.insert(tk.END, f"Training set size: {len(X_train)}\n")
+    text.insert(tk.END, f"Testing set size: {len(X_test)}\n")
+
+# Function for model creation (Example with BiLSTM)
+def create_bilstm_model(input_shape):
+    model = Sequential()
+    model.add(Embedding(input_dim=10000, output_dim=128, input_length=input_shape[1]))
+    model.add(Bidirectional(LSTM(64)))
+    model.add(Dense(6, activation='softmax'))  # Assuming 6 classes
+    model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+# Function to train BiLSTM model
+def train_bilstm_model():
+    global model
+    if X_train is None or Y_train is None:
+        messagebox.showerror("Error", "Preprocessing data first is required.")
+        return
+    
+    model = create_bilstm_model(X_train.shape)
+    history = model.fit(X_train, Y_train, epochs=1, batch_size=32, validation_data=(X_test, Y_test))
+    accuracy = history.history['accuracy'][-1]
+    model_accuracies["BiLSTM"] = accuracy
+    text.insert(tk.END, f"BiLSTM Model training completed with accuracy: {accuracy:.4f}\n")
+
+# Function to train SVM model
+def train_svm_model():
+    global model
+    if X_train is None or Y_train is None:
+        messagebox.showerror("Error", "Preprocessing data first is required.")
+        return
+    
+    model = SVC()
+    model.fit(X_train, Y_train)
+    Y_pred = model.predict(X_test)
+    accuracy = accuracy_score(Y_test, Y_pred)
+    model_accuracies["SVM"] = accuracy
+    text.insert(tk.END, f"SVM Model training completed with accuracy: {accuracy:.4f}\n")
+
+# Function to train Random Forest model
+def train_rf_model():
+    global model
+    if X_train is None or Y_train is None:
+        messagebox.showerror("Error", "Preprocessing data first is required.")
+        return
+    
+    model = RandomForestClassifier()
+    model.fit(X_train, Y_train)
+    Y_pred = model.predict(X_test)
+    accuracy = accuracy_score(Y_test, Y_pred)
+    model_accuracies["Random Forest"] = accuracy
+    text.insert(tk.END, f"Random Forest Model training completed with accuracy: {accuracy:.4f}\n")
+
+# Function to train Logistic Regression model
+def train_lr_model():
+    global model
+    if X_train is None or Y_train is None:
+        messagebox.showerror("Error", "Preprocessing data first is required.")
+        return
+    
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X_train, Y_train)
+    Y_pred = model.predict(X_test)
+    accuracy = accuracy_score(Y_test, Y_pred)
+    model_accuracies["Logistic Regression"] = accuracy
+    text.insert(tk.END, f"Logistic Regression Model training completed with accuracy: {accuracy:.4f}\n")
+
+# Function to plot the comparison graph of model accuracies
+def plot_comparison_graph():
+    if not model_accuracies:
+        messagebox.showerror("Error", "No model accuracies available for comparison.")
+        return
+
+    models = list(model_accuracies.keys())
+    accuracies = list(model_accuracies.values())
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(models, accuracies, color=['blue', 'green', 'red', 'purple'])
+    plt.title("Model Accuracy Comparison")
+    plt.xlabel("Model")
+    plt.ylabel("Accuracy")
+    plt.ylim(0, 1)
+    plt.show()
+
+# Tkinter GUI components
+root = tk.Tk()
+root.title("PROGESI: A PROxy Grammar to Enhance Web Application Firewall for SQL Injection Prevention")
+root.geometry("1300x800")
+
+# Title Label
+font = ('times', 16, 'bold')
+title_label = tk.Label(root, text="PROGESI: A PROxy Grammar to Enhance Web Application Firewall for SQL Injection Prevention", font=font)
+title_label.config(bg='greenyellow')
+title_label.config(height=3, width=120)
+title_label.place(x=0, y=5)
+
+# Text area for displaying results
+font1 = ('times', 12, 'bold')
+text = Text(root, height=20, width=150)
+scroll = tk.Scrollbar(text)
+text.configure(yscrollcommand=scroll.set)
+text.place(x=50, y=120)
+text.config(font=font1)
+
+# Buttons for different functions
+font1 = ('times', 13, 'bold')
+
+# Dataset upload button
+upload_button = tk.Button(root, text="Upload Dataset", font=font1, command=load_dataset)
+upload_button.place(x=50, y=550)
+
+# Data preprocessing button
+preprocess_button = tk.Button(root, text="Data Preprocessing", font=font1, command=preprocess_data)
+preprocess_button.place(x=220, y=550)
+
+# Train BiLSTM button
+train_bilstm_button = tk.Button(root, text="Train BiLSTM ", font=font1, command=train_bilstm_model)
+train_bilstm_button.place(x=400, y=550)
+
+# Train SVM button
+train_svm_button = tk.Button(root, text="Train SVM ", font=font1, command=train_svm_model)
+train_svm_button.place(x=550, y=550)
+
+# Train Random Forest button
+train_rf_button = tk.Button(root, text="Train Random Forest ", font=font1, command=train_rf_model)
+train_rf_button.place(x=680, y=550)
+
+# Train Logistic Regression button
+train_lr_button = tk.Button(root, text="Train Logistic Regression", font=font1, command=train_lr_model)
+train_lr_button.place(x=880, y=550)
+
+# Comparison Graph button
+comparison_graph_button = tk.Button(root, text="Comparison Graph", font=font1, command=plot_comparison_graph)
+comparison_graph_button.place(x=1120, y=550)
+
+
+
+# Start the Tkinter event loop
+root.config(bg='LightSkyBlue')
+root.mainloop()
